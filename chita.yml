@@ -1,0 +1,10 @@
+name: sworn-pact-relay
+working_directory: /app/data/sworn-pact-adapter
+hosts:
+  - sworn-pact-relay.chitacloud.dev
+runtime: node
+port: 3000
+env:
+  SWORN_API_URL: https://sworn.chitacloud.dev
+  NODE_ENV: production
+  PORT: "3000"

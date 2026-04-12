@@ -1,0 +1,26 @@
+{
+  "name": "sworn-pact-adapter",
+  "version": "1.0.0",
+  "description": "Cross-chain adapter bridging PACT escrow (Arbitrum One) with SWORN attestations (Solana)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "relay": "node dist/relay.js",
+    "test": "npx ts-node src/test-attestation.ts"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0",
+    "@solana/web3.js": "^1.95.0",
+    "axios": "^1.7.0",
+    "express": "^4.19.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0",
+    "@types/express": "^4.17.0",
+    "ts-node": "^10.9.0"
+  }
+}
