@@ -1,7 +1,7 @@
 import axios from "axios";
 import crypto from "crypto";
 
-const SWORN_API_URL = process.env.SWORN_API_URL || "https://sworn-devnet.chitacloud.dev";
+const SWORN_API_URL = process.env.SWORN_API_URL || "https://sworn-mainnet.chitacloud.dev";
 
 export interface AttestationRequest {
   subject_agent_id: string;

@@ -5,6 +5,6 @@ hosts:
 runtime: node
 port: 3000
 env:
-  SWORN_API_URL: https://sworn.chitacloud.dev
+  SWORN_API_URL: https://sworn-mainnet.chitacloud.dev
   NODE_ENV: production
   PORT: "3000"

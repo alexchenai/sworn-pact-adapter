@@ -50,8 +50,8 @@ app.get("/network", async (_req, res) => {
         contract: "0x220B97972d6028Acd70221890771E275e7734BFB",
       },
       solana: {
-        network: "devnet",
-        sworn_api: process.env.SWORN_API_URL || "https://sworn-devnet.chitacloud.dev",
+        network: "mainnet-beta",
+        sworn_api: process.env.SWORN_API_URL || "https://sworn-mainnet.chitacloud.dev",
       },
     });
   } catch (err: any) {
