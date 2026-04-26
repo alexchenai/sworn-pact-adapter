@@ -34,6 +34,7 @@ app.get("/health", (_req, res) => {
       "GET /health": "Service health",
       "POST /attest": "Bridge a PACT ID to a SWORN attestation",
       "GET /attestation/:id": "Get attestation details",
+      "GET /attestations": "List attestations (cursor: ?since=ISO&limit=N&network=mainnet-beta) - watcher polling endpoint",
       "GET /verify/:id": "Verify an attestation is valid",
       "GET /network": "Get connected network info",
     },
@@ -80,6 +81,61 @@ app.post("/attest", async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+// GET /attestations — list all attestations the relay knows about, with
+// optional filters for the watcher polling pattern. Added 2026-04-26 to
+// unblock the SWORNAutoSubmit Phase 2 watcher (sworn-autosubmit/watcher)
+// which has no other way to discover newly-bridged attestations. Returns
+// the same shape as GET /attestation/:id, plus a top-level cursor.
+//
+// Query params (all optional):
+//   ?since=<ISO8601>      only return entries with bridged_at >= since
+//   ?limit=<int 1..500>   cap response (default 100)
+//   ?network=<string>     filter by network field (e.g. "mainnet-beta")
+//
+// The store is in-memory and per-process; the watcher MUST be tolerant
+// to a relay restart wiping non-pre-seeded attestations and to
+// out-of-order arrival within a single since window.
+app.get("/attestations", (req, res) => {
+  const sinceParam = typeof req.query.since === "string" ? req.query.since : "";
+  const limitRaw = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : 100;
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 500) : 100;
+  const networkFilter = typeof req.query.network === "string" ? req.query.network : "";
+  const sinceTs = sinceParam ? Date.parse(sinceParam) : 0;
+  if (sinceParam && !Number.isFinite(sinceTs)) {
+    return res.status(400).json({
+      error: "invalid since parameter",
+      hint: "expected ISO 8601 timestamp e.g. 2026-04-26T03:00:00Z",
+    });
+  }
+
+  const all = Object.values(attestationStore) as Array<Record<string, any>>;
+  const filtered = all
+    .filter((a) => {
+      if (networkFilter && a.network !== networkFilter) return false;
+      if (sinceTs) {
+        const t = a.bridged_at ? Date.parse(a.bridged_at) : 0;
+        if (!Number.isFinite(t) || t < sinceTs) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const ta = a.bridged_at ? Date.parse(a.bridged_at) : 0;
+      const tb = b.bridged_at ? Date.parse(b.bridged_at) : 0;
+      return ta - tb;
+    });
+
+  const slice = filtered.slice(0, limit);
+  const nextSince = slice.length > 0 ? slice[slice.length - 1].bridged_at : sinceParam || null;
+
+  res.json({
+    count: slice.length,
+    total_in_store: all.length,
+    next_since: nextSince,
+    note: "Cursor pattern: pass next_since back as ?since= on the next call to skip already-seen entries. Store is in-memory; watcher MUST tolerate restarts and out-of-order arrival within a since window.",
+    items: slice,
+  });
+});
+
 
 app.get("/attestation/:id", async (req, res) => {
   const { id } = req.params;
