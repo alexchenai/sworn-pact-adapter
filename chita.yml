@@ -8,3 +8,4 @@ env:
   SWORN_API_URL: https://sworn-mainnet.chitacloud.dev
   NODE_ENV: production
   PORT: "3000"
+  AT_ADMIN_TOKEN: "2dcc1dda3698720fb52f34248c9f19de9aa3e14c61de0d67"

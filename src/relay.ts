@@ -136,6 +136,68 @@ app.get("/attestations", (req, res) => {
   });
 });
 
+// POST /admin/at-02-replay — clones an existing attestation under a new store
+// key with bumped bridged_at, so the watcher sees the SAME attestation_id in
+// two consecutive cursor windows. Tests the watcher dedup invariant (AT-02).
+// Token-gated via AT_ADMIN_TOKEN env var. Remove after May 6 (AT framework end).
+app.post("/admin/at-02-replay", (req, res) => {
+  const expected = process.env.AT_ADMIN_TOKEN || "";
+  const got = req.header("x-admin-token") || "";
+  if (!expected || got !== expected) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const id = req.body && req.body.attestation_id;
+  if (!id || typeof id !== "string") {
+    return res.status(400).json({ error: "attestation_id (string) is required" });
+  }
+  const original = attestationStore[id];
+  if (!original) {
+    return res.status(404).json({ error: "attestation not found in store", attestation_id: id });
+  }
+  const replayKey = id + "__at02_replay_" + Date.now();
+  const newBridgedAt = new Date(Date.now()).toISOString();
+  attestationStore[replayKey] = { ...original, bridged_at: newBridgedAt };
+  return res.json({
+    success: true,
+    note: "AT-02 replay injected. The same attestation_id now appears at two distinct bridged_at timestamps in the store. Watcher should dedup the second on submittedSet[aid] check.",
+    original_bridged_at: original.bridged_at,
+    replay_bridged_at: newBridgedAt,
+    attestation_id: id,
+    store_keys: [id, replayKey],
+  });
+});
+
+
+// POST /admin/at-02-replay — clones an existing attestation under a new store
+// key with bumped bridged_at, so the watcher sees the SAME attestation_id in
+// two consecutive cursor windows. Tests the watcher dedup invariant (AT-02).
+// Token-gated via AT_ADMIN_TOKEN env var. Remove after May 6 (AT framework end).
+app.post("/admin/at-02-replay", (req, res) => {
+  const expected = process.env.AT_ADMIN_TOKEN || "";
+  const got = (req.header("x-admin-token") || "").toString();
+  if (!expected || got !== expected) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const id = req.body && req.body.attestation_id;
+  if (!id || typeof id !== "string") {
+    return res.status(400).json({ error: "attestation_id (string) is required" });
+  }
+  const original = attestationStore[id];
+  if (!original) {
+    return res.status(404).json({ error: "attestation not found in store", attestation_id: id });
+  }
+  const replayKey = id + "__at02_replay_" + Date.now();
+  const newBridgedAt = new Date(Date.now()).toISOString();
+  attestationStore[replayKey] = { ...original, bridged_at: newBridgedAt };
+  return res.json({
+    success: true,
+    note: "AT-02 replay injected. The same attestation_id now appears at two distinct bridged_at timestamps in the store. Watcher should dedup the second on submittedSet[aid] check.",
+    original_bridged_at: original.bridged_at,
+    replay_bridged_at: newBridgedAt,
+    attestation_id: id,
+    store_keys: [id, replayKey],
+  });
+});
 
 app.get("/attestation/:id", async (req, res) => {
   const { id } = req.params;
@@ -171,6 +233,61 @@ app.get("/verify/:id", async (req, res) => {
     attestation_id: id,
     valid: false,
     reason: "Attestation not found in relay store. Use the Solana tx_signature directly for on-chain verification via solscan.io.",
+  });
+});
+
+// POST /admin/at-02-inject-pair — synthesizes 2 store entries that share the
+// SAME attestation_id but have distinct bridged_at, both matching pact_id="16"
+// and capability_hash=<canonical clean stripped_hash>. The watcher's
+// submittedSet[aid] dedup invariant should accept the first and silently
+// skip the second within a single poll cycle (or two consecutive cycles
+// across cursor advance). Token-gated. Added 2026-05-03 for AT-02 re-fire.
+// Remove after May 6 (AT framework end).
+app.post("/admin/at-02-inject-pair", (req, res) => {
+  const expected = process.env.AT_ADMIN_TOKEN || "";
+  const got = req.header("x-admin-token") || "";
+  if (!expected || got !== expected) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const body = (req.body || {}) as Record<string, any>;
+  const pact_id = typeof body.pact_id === "string" ? body.pact_id : "16";
+  const capability_hash = typeof body.capability_hash === "string"
+    ? body.capability_hash.replace(/^0x/i, "")
+    : "a67d408151085fdb4fd484bac555fcbab3cfc60f1fb2cce861edadcc78183999";
+  const attestation_id = typeof body.attestation_id === "string"
+    ? body.attestation_id
+    : "at02_" + Date.now();
+  const network = typeof body.network === "string" ? body.network : "mainnet-beta";
+  const worker_address = typeof body.worker_address === "string"
+    ? body.worker_address
+    : "0x344441FE9A207fD2c08CBC260aa5e491Fe95711A";
+  const t1 = new Date(Date.now() - 100).toISOString();
+  const t2 = new Date(Date.now()).toISOString();
+  const base: Record<string, any> = {
+    pact_id,
+    worker_address,
+    amount_pact: "0.0",
+    capability_hash,
+    attestation_id,
+    arbitrum_block: 0,
+    attestation_status: "anchored",
+    tx_signature: "AT02SyntheticAttestation_NoOnChainProof",
+    solscan_url: "",
+    network,
+  };
+  const key1 = attestation_id + "__at02_first_" + Date.now();
+  const key2 = attestation_id + "__at02_replay_" + (Date.now() + 1);
+  attestationStore[key1] = { ...base, bridged_at: t1 };
+  attestationStore[key2] = { ...base, bridged_at: t2 };
+  return res.json({
+    success: true,
+    note: "AT-02 inject-pair complete. Two store entries share attestation_id; watcher should dedup the second on submittedSet[aid].",
+    attestation_id,
+    pact_id,
+    capability_hash,
+    network,
+    store_keys: [key1, key2],
+    bridged_at: [t1, t2],
   });
 });
 
