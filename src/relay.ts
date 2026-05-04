@@ -1,5 +1,6 @@
 import express from "express";
 import { SwornPactAdapter } from "./adapter";
+import { evaluateManifest } from "sworn-verifier";
 const app = express();
 app.use(express.json());
 
@@ -289,6 +290,27 @@ app.post("/admin/at-02-inject-pair", (req, res) => {
     store_keys: [key1, key2],
     bridged_at: [t1, t2],
   });
+});
+
+
+// POST /verify-manifest — validates a SWORN AT manifest URL using sworn-verifier
+// (npm package sworn-verifier@^0.1.0). Returns the canonical ManifestDecision
+// byte-compatible with the Go and Python reference reproducers.
+//   Body: { manifest_url: string }
+//   200:  ManifestDecision JSON
+//   400:  { error } when manifest_url missing/invalid
+//   500:  { error } on internal exception
+app.post("/verify-manifest", async (req, res) => {
+  const { manifest_url } = req.body ?? {};
+  if (!manifest_url || typeof manifest_url !== "string") {
+    return res.status(400).json({ error: "manifest_url (string) is required" });
+  }
+  try {
+    const decision = await evaluateManifest(manifest_url);
+    return res.json(decision);
+  } catch (err: any) {
+    return res.status(500).json({ error: err && err.message ? err.message : String(err) });
+  }
 });
 
 const PORT = Number(process.env.PORT || 3000);

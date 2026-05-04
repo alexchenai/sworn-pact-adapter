@@ -1,7 +1,7 @@
 {
   "name": "sworn-pact-adapter",
-  "version": "1.0.0",
-  "description": "Cross-chain adapter bridging PACT escrow (Arbitrum One) with SWORN attestations (Solana)",
+  "version": "1.1.0",
+  "description": "Cross-chain adapter bridging PACT escrow (Arbitrum One) with SWORN attestations (Solana). Includes /verify-manifest endpoint backed by sworn-verifier.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -15,7 +15,8 @@
     "@solana/web3.js": "^1.95.0",
     "axios": "^1.7.0",
     "express": "^4.19.0",
-    "dotenv": "^16.4.0"
+    "dotenv": "^16.4.0",
+    "sworn-verifier": "^0.1.0"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
